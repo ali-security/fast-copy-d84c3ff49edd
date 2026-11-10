@@ -1,0 +1,47 @@
+name: seal-build
+
+# Upstream (planttheidea/fast-copy) ships no CI; this workflow mirrors the
+# package.json scripts: yarn install, `yarn build` (rollup + tsc), `yarn test`
+# (jest via ts-jest), then pack the release tarball.
+
+on:
+  workflow_dispatch:
+    inputs:
+      test-filter:
+        description: "Optional jest test path pattern; empty runs the full suite"
+        required: false
+        default: ""
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "16.14.2"
+
+      - name: Install
+        run: yarn install --frozen-lockfile
+
+      - name: Build
+        run: yarn build
+
+      - name: Test
+        env:
+          TEST_FILTER: ${{ inputs.test-filter }}
+        run: yarn test --ci $TEST_FILTER
+
+      - name: Pack
+        run: |
+          npx -y npm@8.7.0 pack --ignore-scripts
+          ls -l fast-copy-*.tgz
+          tar tzf fast-copy-*.tgz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fast-copy-tgz
+          path: fast-copy-*.tgz
+          if-no-files-found: error
